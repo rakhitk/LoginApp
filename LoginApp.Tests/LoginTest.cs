@@ -2,40 +2,102 @@
 {
     using Microsoft.Playwright;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
     using System.Threading.Tasks;
 
+    /// <summary>
+    /// End-to-End Integration Tests for Login functionality.
+    /// 
+    /// IMPORTANT: To run this test successfully, the LoginApp application must be running.
+    /// 
+    /// Steps to run:
+    /// 1. In one terminal, start the application:
+    ///    dotnet run --project LoginApp/LoginApp.csproj
+    ///
+    /// 2. In another terminal, run the tests:
+    ///    dotnet test LoginApp.Tests/LoginApp.Tests.csproj
+    /// </summary>
     [TestClass]
     public class LoginTest
     {
-        [TestMethod]
-        public async Task Login_Should_Work()
-        {
-            using var playwright = await Playwright.CreateAsync();
+        private readonly string _baseUrl = "http://localhost:5176";
+        private IBrowser _browser;
+        private IPage _page;
 
-            var browser = await playwright.Chromium.LaunchAsync(new()
+        [TestInitialize]
+        public async Task TestInitialize()
+        {
+            // Verify server is running before starting test
+            using var handler = new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, _, _, _) => true };
+            using var client = new HttpClient(handler);
+
+            try
             {
-                Headless = false // browser visible
+                var response = await client.GetAsync($"{_baseUrl}/");
+                if (!response.IsSuccessStatusCode && response.StatusCode != System.Net.HttpStatusCode.OK)
+                {
+                    throw new InvalidOperationException(
+                        $"Application server not responding at {_baseUrl}. " +
+                        $"Please start it with: dotnet run --project LoginApp/LoginApp.csproj");
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                throw new InvalidOperationException(
+                    $"Application server not running at {_baseUrl}. " +
+                    $"Please start it with: dotnet run --project LoginApp/LoginApp.csproj", ex);
+            }
+
+            // Initialize Playwright browser
+            var playwright = await Playwright.CreateAsync();
+            _browser = await playwright.Chromium.LaunchAsync(new()
+            {
+                Headless = false,
+                SlowMo = 300
             });
 
-            var context = await browser.NewContextAsync(new()
+            // Create browser context and page
+            var context = await _browser.NewContextAsync(new()
             {
                 IgnoreHTTPSErrors = true
             });
 
-            var page = await context.NewPageAsync();
+            _page = await context.NewPageAsync();
+        }
 
-            await page.GotoAsync("https://localhost:5001/login");
+        [TestCleanup]
+        public async Task TestCleanup()
+        {
+            if (_page != null)
+            {
+                await _page.CloseAsync();
+            }
 
-            await page.FillAsync("[data-testid='username']", "admin");
-            await page.FillAsync("[data-testid='password']", "1234");
+            if (_browser != null)
+            {
+                await _browser.CloseAsync();
+            }
+        }
 
-            await page.ClickAsync("[data-testid='login-btn']");
+        [TestMethod]
+        public async Task Login_Should_Navigate_To_Dashboard()
+        {
+            // Navigate to login page
+            await _page.GotoAsync($"{_baseUrl}/login");
 
-            await page.WaitForSelectorAsync("text=Login Success");
+            // Fill in login credentials
+            await _page.FillAsync("[data-testid='username']", "admin");
+            await _page.FillAsync("[data-testid='password']", "1234");
 
-            Assert.IsTrue(await page.IsVisibleAsync("text=Login Success"));
+            // Click login button
+            await _page.ClickAsync("[data-testid='login-btn']");
 
-            await browser.CloseAsync();
+            // Verify navigation to dashboard
+            await _page.WaitForURLAsync("**/dashboard");
+
+            // Assert that the URL contains "dashboard"
+            Assert.IsTrue(_page.Url != null && _page.Url.Contains("dashboard"), 
+                $"Expected URL to contain 'dashboard', but got: {_page.Url}");
         }
     }
 }

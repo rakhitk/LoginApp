@@ -3,11 +3,11 @@
 
 <h3>Login</h3>
 
-<input @bind="username" placeholder="Username" id="username" />
+<input @bind="username" placeholder="Username" id="username" data-testid="username" />
 <br />
-<input type="password" @bind="password" placeholder="Password" id="password" />
+<input type="password" @bind="password" placeholder="Password" id="password" data-testid="password" />
 <br />
-<button @onclick="HandleLogin" id="loginBtn">Login</button>
+<button @onclick="HandleLogin" id="loginBtn" data-testid="login-btn">Login</button>
 
 @if (!string.IsNullOrEmpty(errorMessage))
 {
@@ -19,12 +19,14 @@
     string? password;
     string? errorMessage;
 
-
     void HandleLogin()
     {
+        Console.WriteLine("Login clicked"); // 👈 DEBUG
+
         if (username == "admin" && password == "1234")
         {
-            Nav.NavigateTo("/dashboard");
+            Console.WriteLine("Login success");
+            Nav.NavigateTo("/dashboard", forceLoad: true);
         }
         else
         {
