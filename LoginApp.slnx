@@ -1,4 +1,3 @@
 <Solution>
   <Project Path="LoginApp.Tests/LoginApp.Tests.csproj" />
-  <Project Path="LoginApp/LoginApp.csproj" />
 </Solution>
